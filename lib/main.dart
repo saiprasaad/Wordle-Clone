@@ -20,7 +20,8 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   List<List<String>> textValues = List.generate(6, (i) => List.filled(5, ""));
-  late final Future<Map<String, List<int>>> indexMap;
+  late Future<Map<String, List<int>>> indexMap;
+  late String word;
 
   List<List<String>> textValuesPresence =
       List.generate(6, (i) => List.filled(5, ""));
@@ -61,6 +62,7 @@ class _MyAppState extends State<MyApp> {
     26: "M"
   };
   int row = 0, column = 0;
+  bool validWord = false;
 
   int getAlphabetPosition(int i, int j) {
     if (i < 1) {
@@ -74,11 +76,24 @@ class _MyAppState extends State<MyApp> {
 
   Future<Map<String, List<int>>> getRandomWord() async {
     Map<String, List<int>> compareMap = {};
-    String apiUrl = 'https://random-word-api.herokuapp.com/word?length=5';
-    final response = await http.get(Uri.parse(apiUrl));
+    String apiUrl =
+        'https://api.wordnik.com/v4/words.json/randomWord?hasDictionaryDef=true&minLength=5&maxLength=5&api_key=50wn9urpdtws87eu1p22kxln8onnw2wd1qe8uaqvb2knw3e7k';
+    var response = await http.get(Uri.parse(apiUrl));
+    String value = "";
+    RegExp regex = RegExp(r'^[a-zA-Z]+$');
     if (response.statusCode == 200) {
-      final dynamic responseData = json.decode(response.body);
-      String value = responseData[0];
+      while (!validWord) {
+        if(value.isNotEmpty) {
+          response = await http.get(Uri.parse(apiUrl));
+        }
+        final dynamic responseData = json.decode(response.body);
+        value = responseData["word"];
+        word = value.toLowerCase();
+        var check = await wordExists(word);
+        if(check || regex.hasMatch(word)) {
+          validWord = true;
+        }
+      }
       print(value);
       for (int i = 0; i < value.length; i++) {
         randomWord[i] = value[i];
@@ -115,96 +130,118 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     int count = -1;
     String wordToCheck = "";
+    var screenHeight = MediaQuery.of(context).size.height;
+    var blockHeight = MediaQuery.of(context).size.height / 1.5;
+    var keyboardHeight = screenHeight - blockHeight;
+    var screenWidth = MediaQuery.of(context).size.width;
+    if (screenWidth > 500) {
+      screenWidth = 500;
+    }
+    print(screenHeight);
+    print(blockHeight);
+    print(keyboardHeight);
 
     return MaterialApp(
       title: 'Flutter Demo',
       home: FutureBuilder<Map<String, List<int>>>(
-          future: indexMap,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                body: Center(
-                  child: CircularProgressIndicator(),
+        future: indexMap,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          } else {
+            final compareMap = snapshot.data as Map<String, List<int>>;
+            count = -1;
+            return Scaffold(
+              appBar: AppBar(
+                title: const Text(
+                  "Wordle",
+                  style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
                 ),
-              );
-            } else {
-              final compareMap = snapshot.data as Map<String, List<int>>;
-              count = -1;
-              return Scaffold(
-                  appBar: AppBar(
-                    title: const Text(
-                      "Wordle",
-                      style:
-                          TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
-                    ),
-                    centerTitle: true,
-                  ),
-                  body: Container(
-                      padding: const EdgeInsets.all(10),
-                      child: Column(children: [
-                        Column(
-                            children: List.generate(6, (i) {
-                          return Row(
+                centerTitle: true,
+              ),
+              body: Container(
+                padding: const EdgeInsets.fromLTRB(10, 5, 10, 0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Container(
+                        height: blockHeight,
+                        child: Column(
+                          children: List.generate(6, (i) {
+                            return Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: List.generate(5, (j) {
                                 return SizedBox(
-                                    width: 65,
-                                    height: 65,
-                                    child: Card(
-                                      color: Colors.white,
-                                      shape: const RoundedRectangleBorder(
-                                        side: BorderSide(
-                                            color: Colors.black26, width: 1),
-                                        borderRadius: BorderRadius.zero,
+                                  width: 65,
+                                  height: blockHeight / 7.5,
+                                  child: Card(
+                                    color: Colors.white,
+                                    shape: const RoundedRectangleBorder(
+                                      side: BorderSide(
+                                          color: Colors.black26, width: 1),
+                                      borderRadius: BorderRadius.zero,
+                                    ),
+                                    child: AnimatedContainer(
+                                      color: i >= row
+                                          ? Colors.white
+                                          : (textValuesPresence[i][j] ==
+                                                  "Correct"
+                                              ? const Color(0xff6ca965)
+                                              : (textValuesPresence[i][j] ==
+                                                      "Partial"
+                                                  ? const Color(0xffc8b653)
+                                                  : const Color(0xff787c7f))),
+                                      duration:
+                                          const Duration(milliseconds: 1000),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            textValues[i][j],
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: screenWidth * 0.060,
+                                              color: textValuesPresence[i][j]
+                                                      .isNotEmpty
+                                                  ? Colors.white
+                                                  : Colors.black,
+                                            ),
+                                          )
+                                        ],
                                       ),
-                                      child: AnimatedContainer(
-                                        color: i >= row
-                                            ? Colors.white
-                                            : (textValuesPresence[i][j] ==
-                                                    "Correct"
-                                                ? const Color(0xff6ca965)
-                                                : (textValuesPresence[i][j] ==
-                                                        "Partial"
-                                                    ? const Color(0xffc8b653)
-                                                    : const Color(0xff787c7f))),
-                                        duration:
-                                            const Duration(milliseconds: 1000),
-                                        child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Text(
-                                                textValues[i][j],
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  fontSize: 30,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: textValuesPresence[i]
-                                                              [j]
-                                                          .isNotEmpty
-                                                      ? Colors.white
-                                                      : Colors.black,
-                                                ),
-                                              )
-                                            ]),
-                                      ),
-                                    ));
-                              }));
-                        })),
-                        const Padding(
-                            padding: EdgeInsets.fromLTRB(0, 20, 0, 0)),
-                        Column(
+                                    ),
+                                  ),
+                                );
+                              }),
+                            );
+                          }),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                        padding: EdgeInsets.only(bottom: 10),
+                        child: SizedBox(
+                          height: keyboardHeight,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.start,
                             children: List.generate(3, (i) {
-                          return Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: List.generate(
-                                  i == 0 ? 10 : (i == 1 ? 9 : 9), (j) {
-                                count++;
-                                return count == 19
-                                    ? SizedBox(
-                                        width:  MediaQuery.of(context).size.width < 500 ? 55 : 70,
-                                        height: 60,
-                                        child: GestureDetector(
+                              return Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: List.generate(
+                                    i == 0 ? 10 : (i == 1 ? 9 : 9), (j) {
+                                  count++;
+                                  return count == 19
+                                      ? SizedBox(
+                                          height: keyboardHeight / 3,
+                                          width: screenWidth / 6,
+                                          child: GestureDetector(
                                             onTap: () async {
                                               for (var c = 0;
                                                   c < textValues[row].length;
@@ -216,36 +253,154 @@ class _MyAppState extends State<MyApp> {
                                                   await wordExists(wordToCheck);
                                               setState(() {
                                                 if (isValidWord) {
-                                                  for (int col = 0;
-                                                      col <
-                                                          textValues[row]
-                                                              .length;
-                                                      col++) {
-                                                    if (compareMap.containsKey(
-                                                        textValues[row][col]
-                                                            .toLowerCase())) {
-                                                      if (compareMap[textValues[
-                                                                      row][col]
-                                                                  .toLowerCase()]!
-                                                              .isNotEmpty &&
-                                                          compareMap[textValues[
-                                                                      row][col]
-                                                                  .toLowerCase()]!
-                                                              .contains(
-                                                                  col + 1)) {
+                                                  if (word.toLowerCase() ==
+                                                      wordToCheck
+                                                          .toLowerCase()) {
+                                                    setState(() {
+                                                      for (int col = 0;
+                                                          col <
+                                                              textValues[row]
+                                                                  .length;
+                                                          col++) {
                                                         textValuesPresence[row]
                                                             [col] = "Correct";
+                                                      }
+                                                      row = row + 1;
+                                                      column = 0;
+
+                                                      showDialog<String>(
+                                                        barrierDismissible:
+                                                            false,
+                                                        context: context,
+                                                        builder: (BuildContext
+                                                                context) =>
+                                                            AlertDialog(
+                                                          title: const Text(
+                                                              'You Won!'),
+                                                          content: const Text(
+                                                              'Congratulations! You have guessed the word correctly!'),
+                                                          actions: <Widget>[
+                                                            TextButton(
+                                                              onPressed: () => {
+                                                                setState(() {
+                                                                  count = -1;
+                                                                  validWord = false;
+                                                                  row = 0;
+                                                                  column = 0;
+                                                                  textValues = List.generate(
+                                                                      6,
+                                                                      (i) => List
+                                                                          .filled(
+                                                                              5,
+                                                                              ""));
+                                                                  textValuesPresence =
+                                                                      List.generate(
+                                                                          6,
+                                                                          (i) => List.filled(
+                                                                              5,
+                                                                              ""));
+                                                                  randomWord =
+                                                                      List.filled(
+                                                                          5,
+                                                                          "");
+                                                                  indexMap =
+                                                                      getRandomWord();
+                                                                  Navigator.pop(
+                                                                      context,
+                                                                      'Start Again');
+                                                                })
+                                                              },
+                                                              child: const Text(
+                                                                  'Start Again'),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      );
+                                                    });
+                                                  } else {
+                                                    for (int col = 0;
+                                                        col <
+                                                            textValues[row]
+                                                                .length;
+                                                        col++) {
+                                                      if (compareMap.containsKey(
+                                                          textValues[row][col]
+                                                              .toLowerCase())) {
+                                                        if (compareMap[textValues[
+                                                                            row]
+                                                                        [col]
+                                                                    .toLowerCase()]!
+                                                                .isNotEmpty &&
+                                                            compareMap[textValues[
+                                                                            row]
+                                                                        [col]
+                                                                    .toLowerCase()]!
+                                                                .contains(
+                                                                    col + 1)) {
+                                                          textValuesPresence[
+                                                                  row][col] =
+                                                              "Correct";
+                                                        } else {
+                                                          textValuesPresence[
+                                                                  row][col] =
+                                                              "Partial";
+                                                        }
                                                       } else {
                                                         textValuesPresence[row]
-                                                            [col] = "Partial";
+                                                            [col] = "Inorrect";
                                                       }
-                                                    } else {
-                                                      textValuesPresence[row]
-                                                          [col] = "Inorrect";
+                                                    }
+                                                    row = row + 1;
+                                                    column = 0;
+                                                    if (row == 6) {
+                                                      showDialog<String>(
+                                                        context: context,
+                                                        builder: (BuildContext
+                                                                context) =>
+                                                            AlertDialog(
+                                                          title: const Text(
+                                                              'You Lost!'),
+                                                          content: Text(
+                                                              "The word was $word, That's Okay! Try Again!"),
+                                                          actions: <Widget>[
+                                                            TextButton(
+                                                              onPressed: () => {
+                                                                setState(() {
+                                                                  count = -1;
+                                                                  row = 0;
+                                                                  validWord = false;
+                                                                  column = 0;
+                                                                  textValues = List.generate(
+                                                                      6,
+                                                                      (i) => List
+                                                                          .filled(
+                                                                              5,
+                                                                              ""));
+                                                                  textValuesPresence =
+                                                                      List.generate(
+                                                                          6,
+                                                                          (i) => List.filled(
+                                                                              5,
+                                                                              ""));
+                                                                  randomWord =
+                                                                      List.filled(
+                                                                          5,
+                                                                          "");
+                                                                  indexMap =
+                                                                      getRandomWord();
+                                                                  Navigator.pop(
+                                                                      context,
+                                                                      'OK');
+                                                                })
+                                                              },
+                                                              child: const Text(
+                                                                  'OK'),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      );
                                                     }
                                                   }
-                                                  row = row + 1;
-                                                  column = 0;
                                                 } else {
                                                   ScaffoldMessenger.of(context)
                                                       .showSnackBar(
@@ -255,20 +410,6 @@ class _MyAppState extends State<MyApp> {
                                                   ));
                                                 }
                                               });
-
-                                              // }
-                                              // }
-                                              // else {
-                                              //   Fluttertoast.showToast(
-                                              //     msg: "Not a valid word!",
-                                              //     toastLength: Toast.LENGTH_SHORT,
-                                              //     gravity: ToastGravity.BOTTOM,
-                                              //     backgroundColor: Colors.grey,
-                                              //     textColor: Colors.white,
-                                              //     fontSize: 16.0,
-                                              //   );
-                                              // }
-                                              // }
                                             },
                                             child: Card(
                                               color: Colors.grey[300],
@@ -277,42 +418,41 @@ class _MyAppState extends State<MyApp> {
                                                     BorderRadius.circular(5),
                                               ),
                                               elevation: 2,
-                                              child: const Column(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.center,
-                                                  children: [
-                                                    Text(
-                                                      "ENTER",
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                      style: TextStyle(
-                                                          fontSize: 14,
-                                                          fontWeight:
-                                                              FontWeight.bold),
-                                                    )
-                                                  ]),
-                                            )),
-                                      )
-                                    : (count != 27
-                                        ? SizedBox(
-                                            width: MediaQuery.of(context).size.width < 500 ? 35 : 50,
-                                            height: 60,
-                                            child: GestureDetector(
+                                              child: Column(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Text(
+                                                    "ENTER",
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: screenWidth *
+                                                            0.045),
+                                                  )
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      : (count != 27
+                                          ? SizedBox(
+                                              width: screenWidth / 11,
+                                              height: keyboardHeight / 3,
+                                              child: GestureDetector(
                                                 onTap: () => {
-                                                      setState(() {
-                                                        if (row < 6 &&
-                                                            column < 5) {
-                                                          textValues[row]
-                                                                  [column] =
-                                                              alphabetsMap[
-                                                                      getAlphabetPosition(
-                                                                          i,
-                                                                          j)] ??
-                                                                  "";
-                                                          column = column + 1;
-                                                        }
-                                                      })
-                                                    },
+                                                  setState(() {
+                                                    if (row < 6 && column < 5) {
+                                                      textValues[row][
+                                                          column] = alphabetsMap[
+                                                              getAlphabetPosition(
+                                                                  i, j)] ??
+                                                          "";
+                                                      column = column + 1;
+                                                    }
+                                                  })
+                                                },
                                                 child: Card(
                                                   color: Colors.grey[300],
                                                   shape: RoundedRectangleBorder(
@@ -322,41 +462,43 @@ class _MyAppState extends State<MyApp> {
                                                   ),
                                                   elevation: 2,
                                                   child: Column(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .center,
-                                                      children: [
-                                                        Text(
-                                                          alphabetsMap[count]
-                                                                  ?.toString() ??
-                                                              "",
-                                                          textAlign:
-                                                              TextAlign.center,
-                                                          style: const TextStyle(
-                                                              fontSize: 20,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold),
-                                                        )
-                                                      ]),
-                                                )),
-                                          )
-                                        : SizedBox(
-                                           width: MediaQuery.of(context).size.width < 500 ? 50 : 70,
-                                            height: 60,
-                                            child: GestureDetector(
-                                                onTap: () => {
-                                                      setState(
-                                                        () {
-                                                          if (column - 1 >= 0) {
-                                                            textValues[row][
-                                                                column -
-                                                                    1] = "";
-                                                            column = column - 1;
-                                                          }
-                                                        },
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    children: [
+                                                      Text(
+                                                        alphabetsMap[count]
+                                                                ?.toString() ??
+                                                            "",
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        style: TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            fontSize:
+                                                                screenWidth *
+                                                                    0.060),
                                                       )
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          : SizedBox(
+                                              width: screenWidth / 8,
+                                              height: keyboardHeight / 3,
+                                              child: GestureDetector(
+                                                onTap: () => {
+                                                  setState(
+                                                    () {
+                                                      if (column - 1 >= 0) {
+                                                        textValues[row]
+                                                            [column - 1] = "";
+                                                        column = column - 1;
+                                                      }
                                                     },
+                                                  )
+                                                },
                                                 child: Card(
                                                   color: Colors.grey[300],
                                                   shape: RoundedRectangleBorder(
@@ -366,20 +508,28 @@ class _MyAppState extends State<MyApp> {
                                                   ),
                                                   elevation: 2,
                                                   child: const Column(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .center,
-                                                      children: [
-                                                        Icon(Icons.backspace,
-                                                            size: 20),
-                                                      ]),
-                                                )),
-                                          ));
-                              }));
-                        }))
-                      ])));
-            }
-          }),
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    children: [
+                                                      Icon(Icons.backspace),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ));
+                                }),
+                              );
+                            }),
+                          ),
+                        )),
+                  ],
+                ),
+              ),
+            );
+          }
+        },
+      ),
     );
   }
 }
