@@ -7,7 +7,6 @@ void main() {
 }
 
 // Todo:
-// Dialog win/lose
 // Keyboard press
 // Fade in keyboard
 
@@ -83,14 +82,14 @@ class _MyAppState extends State<MyApp> {
     RegExp regex = RegExp(r'^[a-zA-Z]+$');
     if (response.statusCode == 200) {
       while (!validWord) {
-        if(value.isNotEmpty) {
+        if (value.isNotEmpty) {
           response = await http.get(Uri.parse(apiUrl));
         }
         final dynamic responseData = json.decode(response.body);
         value = responseData["word"];
         word = value.toLowerCase();
         var check = await wordExists(word);
-        if(check || regex.hasMatch(word)) {
+        if (check || regex.hasMatch(word)) {
           validWord = true;
         }
       }
@@ -284,7 +283,8 @@ class _MyAppState extends State<MyApp> {
                                                               onPressed: () => {
                                                                 setState(() {
                                                                   count = -1;
-                                                                  validWord = false;
+                                                                  validWord =
+                                                                      false;
                                                                   row = 0;
                                                                   column = 0;
                                                                   textValues = List.generate(
@@ -368,7 +368,8 @@ class _MyAppState extends State<MyApp> {
                                                                 setState(() {
                                                                   count = -1;
                                                                   row = 0;
-                                                                  validWord = false;
+                                                                  validWord =
+                                                                      false;
                                                                   column = 0;
                                                                   textValues = List.generate(
                                                                       6,
